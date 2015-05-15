@@ -166,15 +166,19 @@
                 (26 . :cardio-training) (27 . :indoor-walking) (28 . :e-bike-fitness)
                 (254 . :all)))))
 
+(define-parser :sint32 (value)
+  (logior value (- (mask-field (byte 1 31) value))))
+
+
 
 (defun reader-data-message (local stream &optional offset)
   (let* ((definition (gethash local *definitions*)))
-    (push (list (message-type definition) offset
+    (push (cons (message-type definition)
                 (loop for field across (fields definition)
                       for value = (funcall (parser field)
-                                         (read-value 'integer stream :bytes (size field)))
+                                           (read-value 'integer stream :bytes (size field)))
                       for scale = (scale field)
-                      collect (list (name field)
+                      collect (cons (name field)
                                     (if scale
                                         (/ value scale)
                                         value))))
