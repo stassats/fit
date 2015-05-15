@@ -44,24 +44,27 @@
                       (data-length u4)
                       (magic (ascii-string :length 4))
                       (crc (crc :length (- header-length 12)))))
+
 (defvar *definitions*)
 (defvar *data*)
 
 (defun parse-fit (file)
   (with-open-file (stream file :element-type '(unsigned-byte 8))
-    (let ((header (make-instance 'fit-header)))
+    (let ((header (make-instance 'fit-header))
+          (*definitions* (make-hash-table))
+          *data*)
       (read-object header stream)
       (assert (equal (magic header) ".FIT"))
-      (let ((*definitions* (make-hash-table))
-            *data*)
-        (loop while (< (file-position stream) (- (data-length header) 2))
-              do
-              (read-data stream))
-        *data*))))
+      (loop while (< (file-position stream)
+                     (- (data-length header) 2))
+            do
+            (read-data stream))
+      *data*)))
 
 (defun read-header (stream)
   (let* ((byte (read-byte stream))
-         (time (ldb-test (byte 1 7)  byte)))
+         (time (ldb-test (byte 1 7) byte)))
+    (declare (type (unsigned-byte 8) byte))
     (if time
         (values :time
                 (ldb (byte 5 0) byte)
@@ -70,7 +73,7 @@
                 (if (ldb-test (byte 1 6)  byte)
                     :definition
                     :data)
-                (ldb (byte 3 0) byte)))))
+                (ldb (byte 4 0) byte)))))
 
 (define-binary-class field-definition ()
                      ((field-number u1)
@@ -103,8 +106,6 @@
 
 (defconstant +date-time-offset+ (encode-universal-time 0 0 0 31 12 1989 0))
 
-(defmethod decode-message-field (type value)
-  value)
 (defvar *parsers* nil)
 
 (defmacro define-parser (type args &body body)
@@ -116,6 +117,7 @@
        ',name)))
 
 (define-parser :date-time (value)
+  (declare (type (unsigned-byte 32) value))
   (+ +date-time-offset+ value))
 
 (define-parser :lap-trigger (value)
@@ -171,12 +173,13 @@
 
 
 
-(defun reader-data-message (local stream &optional offset)
+(defun read-data-message (local stream &optional offset)
   (let* ((definition (gethash local *definitions*)))
     (push (cons (message-type definition)
                 (loop for field across (fields definition)
                       for value = (funcall (parser field)
-                                           (read-value 'integer stream :bytes (size field)))
+                                           (read-value 'integer stream
+                                                       :bytes (size field)))
                       for scale = (scale field)
                       collect (cons (name field)
                                     (if scale
@@ -184,13 +187,15 @@
                                         value))))
           *data*)))
 
-(defun reader-definition-message (local stream)
+(defun read-definition-message (local stream)
   (let ((definition (make-instance 'definition-message)))
     (read-object definition stream)
     (let* ((type (cdr (assoc (message-number definition) *message-types*)))
            (field-types (cdr (assoc type *message-subtypes*))))
       (setf (message-type definition) type
             (field-types definition) field-types)
+      ;; no support for big-endidan
+      (assert (zerop (architecture definition)))
       (loop for field across (fields definition)
             for (name type scale) = (cdr (assoc (field-number field) field-types))
             do (setf (parser field) (getf *parsers* type #'identity)
@@ -204,11 +209,11 @@
 (defun read-data (stream)
   (multiple-value-bind (normal message-type local-message-type) (read-header stream)
     (cond ((eq normal :time)
-           (reader-data-message local-message-type stream message-type))
+           (read-data-message local-message-type stream message-type))
           ((eq message-type :definition)
-           (reader-definition-message local-message-type stream))
+           (read-definition-message local-message-type stream))
           ((eq message-type :data)
-           (reader-data-message local-message-type stream))
+           (read-data-message local-message-type stream))
           (t
            (error "lose")))))
 
@@ -231,12 +236,12 @@
     (list (list :type (ecase type
                         (:cycling :bike-ride)
                         (:running :run))
-                :start-time (local-time:universal-to-timestamp (cdr (assoc :start-time session)))
+                :start-time (cdr (assoc :start-time session))
                 :time (cdr (assoc :total-timer-time session))
                 :elapsed-time (cdr (assoc :total-elapsed-time session))
                 :distance (cdr (assoc :total-distance session))
                 :avg-speed (cdr (assoc :avg-speed session))
                 :max-speed (cdr (assoc :max-speed session))
-                :avg-cadence (smooth-avg-cadence parsed )
+                :avg-cadence (smooth-avg-cadence parsed)
                 :avg-hr (cdr (assoc :avg-heart-rate session))
                 :max-hr (cdr (assoc :max-heart-rate session))))))
