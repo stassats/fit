@@ -2,4 +2,7 @@
 
 (defpackage #:fit
   (:use #:cl #:binary-data)
-  (:export ))
+  (:export
+   #:parse-fit
+   #:summarize
+   #:convert-to-gpx))

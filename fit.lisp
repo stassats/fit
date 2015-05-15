@@ -212,3 +212,31 @@
           (t
            (error "lose")))))
 
+(defun smooth-avg-cadence (data)
+  (loop with previous = 0
+        for (type . fields) in data
+        for cadence = (cdr (assoc :cadence fields))
+        when (and (eq type :record)
+                  cadence
+                  (< cadence 160)
+                  (or (zerop previous)
+                      (< (- cadence previous) 15)))
+        maximize cadence
+        and do (setf previous cadence)))
+
+(defun summarize (file)
+  (let* ((parsed (parse-fit file))
+         (session (cdr (assoc :session parsed)))
+         (type (cdr (assoc :sport session))))
+    (list (list :type (ecase type
+                        (:cycling :bike-ride)
+                        (:running :run))
+                :start-time (local-time:universal-to-timestamp (cdr (assoc :start-time session)))
+                :time (cdr (assoc :total-timer-time session))
+                :elapsed-time (cdr (assoc :total-elapsed-time session))
+                :distance (cdr (assoc :total-distance session))
+                :avg-speed (cdr (assoc :avg-speed session))
+                :max-speed (cdr (assoc :max-speed session))
+                :avg-cadence (smooth-avg-cadence parsed )
+                :avg-hr (cdr (assoc :avg-heart-rate session))
+                :max-hr (cdr (assoc :max-heart-rate session))))))
