@@ -1,0 +1,11 @@
+#!/bin/sh
+# /etc/udev/rules.d/garmin-edge.rules:
+# SUBSYSTEM=="usb", ATTR{idVendor}=="091e", ATTR{idProduct}=="2491", ACTION=="add", RUN="/bin/su stas -c 'screen -d -m -S garmin ~/c/bin/process-garmin'"
+while ! mount /mnt/garmin; do
+  sleep 2
+done
+ 
+export PATH=$PATH:/usr/bin:/usr/local/bin
+export DISPLAY=:0.0
+ 
+~/c/bin/do-garmin-process && umount /mnt/garmin

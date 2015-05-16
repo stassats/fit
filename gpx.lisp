@@ -1,9 +1,17 @@
 (in-package :fit)
+
 (defun semicircle-to-degrees (x)
   (float (/ x (/ (expt 2 31) 180)) 1d0))
 
 (defun convert-to-gpx (input output)
-  (let ((parsed (parse-fit input)))
+  (let* ((parsed (parse-fit input))
+         (output (if (pathname-name output)
+                     output
+                     (make-pathname :name (format nil "activity_~a"
+                                                  (- (cdr (assoc :start-time (cdr (assoc :session parsed))))
+                                                     +date-time-offset+))
+                                    :type "gpx"
+                                    :defaults output))))
     (with-open-file (stream output :direction :output :if-exists :supersede)
       (cxml:with-xml-output (cxml:make-character-stream-sink stream)
         (cxml:with-element "gpx"
@@ -21,4 +29,5 @@
                           (cxml:attribute "lat"
                                           (format nil "~f" (semicircle-to-degrees lat)))
                           (cxml:attribute "lon"
-                                          (format nil "~f"(semicircle-to-degrees lon))))))))))))))
+                                          (format nil "~f"(semicircle-to-degrees lon))))))))))))
+    output))

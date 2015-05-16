@@ -6,4 +6,5 @@
                alexandria cxml)
   :components ((:file "packages")
                (:file "data")
-               (:file "fit")))
+               (:file "fit")
+               (:file "gpx")))

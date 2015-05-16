@@ -199,9 +199,9 @@
       (loop for field across (fields definition)
             for (name type scale) = (cdr (assoc (field-number field) field-types))
             do (setf (parser field) (getf *parsers* type #'identity)
-                     (scale field) (if (and (numberp scale)
-                                            (/= scale 1))
-                                       (float scale 1d0))
+                     (scale field) (and (numberp scale)
+                                        (/= scale 1)
+                                        scale)
                      (name field) (or name
                                       (field-number field)))))
     (setf (gethash local *definitions*) definition)))
@@ -217,7 +217,7 @@
           (t
            (error "lose")))))
 
-(defun smooth-avg-cadence (data)
+(defun smooth-max-cadence (data)
   (loop with previous = 0
         for (type . fields) in data
         for cadence = (cdr (assoc :cadence fields))
@@ -233,15 +233,16 @@
   (let* ((parsed (parse-fit file))
          (session (cdr (assoc :session parsed)))
          (type (cdr (assoc :sport session))))
-    (list (list :type (ecase type
-                        (:cycling :bike-ride)
-                        (:running :run))
-                :start-time (cdr (assoc :start-time session))
-                :time (cdr (assoc :total-timer-time session))
-                :elapsed-time (cdr (assoc :total-elapsed-time session))
-                :distance (cdr (assoc :total-distance session))
-                :avg-speed (cdr (assoc :avg-speed session))
-                :max-speed (cdr (assoc :max-speed session))
-                :avg-cadence (smooth-avg-cadence parsed)
-                :avg-hr (cdr (assoc :avg-heart-rate session))
-                :max-hr (cdr (assoc :max-heart-rate session))))))
+    (list :type (ecase type
+                  (:cycling :bike-ride)
+                  (:running :run))
+          :start-time (cdr (assoc :start-time session))
+          :time (cdr (assoc :total-timer-time session))
+          :elapsed-time (cdr (assoc :total-elapsed-time session))
+          :distance (cdr (assoc :total-distance session))
+          :avg-speed (cdr (assoc :avg-speed session))
+          :max-speed (cdr (assoc :max-speed session))
+          :avg-cadence (cdr (assoc :avg-cadence session))
+          :max-cadence (smooth-max-cadence parsed)
+          :avg-hr (cdr (assoc :avg-heart-rate session))
+          :max-hr (cdr (assoc :max-heart-rate session)))))
