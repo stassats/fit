@@ -66,9 +66,10 @@
     (cond (files-to-process
            (mapc #'process-file files-to-process)
            (write-config)
-           (sb-ext:exit :code 0))
+           (throw 'exit 0))
           (t
-           (write-line "Nothing to process")))))
+           (write-line "Nothing to process")
+           (throw 'exit 1)))))
 
 (defun process-fr ()
   (let ((*device-type* :fr))
@@ -82,11 +83,15 @@
 (sb-ext:save-lisp-and-die "do-garmin-process"
                           :toplevel
                           (lambda ()
-                            (unwind-protect
-                                 (if (equal (file-namestring
-                                             (car sb-ext:*posix-argv*))
-                                            "pgfr")
-                                     (garmin:process-fr)
-                                     (garmin:process-edge))
-                              (sb-ext:exit :code 1)))
+                            (let ((code 1))
+                              (unwind-protect
+                                   (setf code
+                                         (catch 'exit
+                                           (if (equal (file-namestring
+                                                       (car sb-ext:*posix-argv*))
+                                                      "pgfr")
+                                               (garmin:process-fr)
+                                               (garmin:process-edge))
+                                           0))
+                                (sb-ext:exit :code code))))
                           :executable t)
