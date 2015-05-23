@@ -66,10 +66,10 @@
     (cond (files-to-process
            (mapc #'process-file files-to-process)
            (write-config)
-           (throw 'exit 0))
+           (throw :exit 0))
           (t
            (write-line "Nothing to process")
-           (throw 'exit 1)))))
+           (throw :exit 1)))))
 
 (defun process-fr ()
   (let ((*device-type* :fr))
@@ -86,7 +86,7 @@
                             (let ((code 1))
                               (unwind-protect
                                    (setf code
-                                         (catch 'exit
+                                         (catch :exit
                                            (if (equal (file-namestring
                                                        (car sb-ext:*posix-argv*))
                                                       "pgfr")
