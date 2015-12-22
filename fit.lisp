@@ -231,9 +231,10 @@
 
 (defun summarize (file)
   (let* ((parsed (parse-fit file))
-         (session (cdr (assoc :session parsed)))
+         (session (cdr (or (assoc :session parsed)
+                           (assoc :lap parsed))))
          (type (cdr (assoc :sport session))))
-    (list :type (ecase type
+    (list :type (case type
                   (:cycling :bike-ride)
                   (:running :run))
           :start-time (cdr (assoc :start-time session))
