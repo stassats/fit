@@ -8,7 +8,8 @@
          (output (if (pathname-name output)
                      output
                      (make-pathname :name (format nil "activity_~a"
-                                                  (- (cdr (assoc :start-time (cdr (assoc :session parsed))))
+                                                  (- (cdr (assoc :start-time (cdr (or (assoc :session parsed)
+                                                                                      (assoc :lap parsed)))))
                                                      +date-time-offset+))
                                     :type "gpx"
                                     :defaults output))))

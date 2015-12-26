@@ -20,7 +20,8 @@
                  for msb from (* 8 (1- bytes)) downto 8 by 8
                  do (setf (ldb (byte 8 msb) value) (read-byte in))
                  finally (return value)))
-  (:writer (out value)))
+  (:writer (out value)
+           (declare (ignore out value))))
 
 (define-binary-type ascii-string (length)
   (:reader (in)
@@ -29,13 +30,15 @@
                    do (setf (char string i)
                             (code-char (read-byte in))))
              string))
-  (:writer (out value)))
+  (:writer (out value)
+           (declare (ignore out value))))
 
 (define-binary-type crc (length)
   (:reader (in)
            (loop repeat length
                  sum (read-byte in)))
-  (:writer (out value)))
+  (:writer (out value)
+           (declare (ignore out value))))
 
 (define-binary-class fit-header ()
                      ((header-length u1)
@@ -168,12 +171,31 @@
                 (26 . :cardio-training) (27 . :indoor-walking) (28 . :e-bike-fitness)
                 (254 . :all)))))
 
-(define-parser :sint32 (value)
-  (logior value (- (mask-field (byte 1 31) value))))
+(defmacro define-int-parsers ()
+  (flet ((make-parser (size signed zero)
+           (let ((invalid (if zero
+                              0
+                              (ldb (byte (- size (if signed 1 0)) 0) -1))))
+             `(define-parser ,(intern (format nil "~:[U~;S~]INT~a~:[~;Z~]"
+                                              signed size zero)
+                                      :keyword)
+                  (value)
+                (unless (= value ,invalid)
+                  ,(if signed
+                       `(logior value (- (mask-field (byte 1 ,(1- size)) value)))
+                       `value))))))
+   `(progn
+      ,@(loop for i in '(8 16 32)
+              collect
+              (make-parser i t nil)
+              collect
+              (make-parser i nil nil)
+              collect
+              (make-parser i nil t)))))
 
+(define-int-parsers)
 
-
-(defun read-data-message (local stream &optional offset)
+(defun read-data-message (local stream)
   (let* ((definition (gethash local *definitions*)))
     (push (cons (message-type definition)
                 (loop for field across (fields definition)
@@ -182,7 +204,7 @@
                                                        :bytes (size field)))
                       for scale = (scale field)
                       collect (cons (name field)
-                                    (if scale
+                                    (if (and value scale)
                                         (/ value scale)
                                         value))))
           *data*)))
@@ -209,7 +231,7 @@
 (defun read-data (stream)
   (multiple-value-bind (normal message-type local-message-type) (read-header stream)
     (cond ((eq normal :time)
-           (read-data-message local-message-type stream message-type))
+           (read-data-message local-message-type stream))
           ((eq message-type :definition)
            (read-definition-message local-message-type stream))
           ((eq message-type :data)
